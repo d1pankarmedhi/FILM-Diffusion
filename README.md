@@ -1,11 +1,13 @@
+<div align="center">
+
 # FiLM-Diffusion: Feature-wise Linear Modulation for Efficient Text-Conditional Diffusion Models
 
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT) [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 
 A modular, production-ready PyTorch implementation of **FiLM-Diffusion** (Feature-wise Linear Modulation for text/class-conditional diffusion models).
+
+</div>
 
 This repository challenges the prevailing assumption that expensive **Cross-Attention** mechanisms are mandatory for conditional diffusion models. By replacing cross-attention with feature-wise affine transformations ($\text{FiLM}$), we achieve **comparable generation quality** while delivering:
 - ⚡ **3.2× Faster Inference Throughput** ($42.3$ vs. $13.2$ samples/sec)
