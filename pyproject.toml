@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "film-diffusion"
+version = "0.1.0"
+description = "FiLM-Diffusion: Feature-wise Linear Modulation for Efficient Text-Conditional Diffusion Models"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Dipankar Medhi", email = "d1pankarmedhi@gmail.com" }
+]
+keywords = [
+    "diffusion-models",
+    "film",
+    "feature-wise-linear-modulation",
+    "deep-learning",
+    "generative-ai",
+    "pytorch",
+    "image-generation",
+    "text-to-image"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "numpy>=1.22.0",
+    "scipy>=1.9.0",
+    "matplotlib>=3.5.0",
+    "tqdm>=4.64.0",
+    "imageio>=2.20.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+profiling = [
+    "psutil>=5.9.0",
+    "thop>=0.1.1",
+    "fvcore>=0.1.5",
+    "ptflops>=0.7",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+]
+all = [
+    "film-diffusion[profiling,dev]",
+]
+
+[project.scripts]
+film-train = "scripts.train:main"
+film-sample = "scripts.sample:main"
+film-eval = "scripts.evaluate:main"
+film-profile = "scripts.profile_model:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["film_diffusion*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
