@@ -23,6 +23,7 @@ def parse_args():
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints", help="Directory to store model weights.")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint or 'latest' to resume.")
     parser.add_argument("--no_amp", action="store_true", help="Disable Automatic Mixed Precision (AMP).")
+    parser.add_argument("--no_compile", action="store_true", help="Disable torch.compile on the UNet denoiser.")
     parser.add_argument("--grad_accum", type=int, default=1, help="Gradient accumulation steps.")
     parser.add_argument("--sample_interval", type=int, default=5, help="Epoch interval to generate validation samples.")
     parser.add_argument("--device", type=str, default=None, help="Device to run training on (cuda or cpu).")
@@ -57,6 +58,7 @@ def main():
     guidance_scale = float(train_cfg.get("guidance_scale", args.guidance_scale))
     checkpoint_dir = train_cfg.get("checkpoint_dir", args.checkpoint_dir)
     use_amp = not args.no_amp if args.no_amp else train_cfg.get("use_amp", True)
+    use_compile = (not args.no_compile) if args.no_compile else train_cfg.get("use_compile", True)
     grad_accum = train_cfg.get("gradient_accumulation_steps", args.grad_accum)
     sample_interval = train_cfg.get("sample_interval", args.sample_interval)
 
@@ -93,6 +95,7 @@ def main():
         checkpoint_dir=checkpoint_dir,
         device=device,
         use_amp=use_amp,
+        use_compile=use_compile,
         gradient_accumulation_steps=grad_accum,
         sample_interval=sample_interval,
     )

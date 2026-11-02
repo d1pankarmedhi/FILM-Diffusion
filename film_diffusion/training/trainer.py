@@ -52,6 +52,7 @@ class Trainer:
         checkpoint_dir: str = "./checkpoints",
         device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu",
         use_amp: bool = True,
+        use_compile: bool = True,
         gradient_accumulation_steps: int = 1,
         sample_interval: int = 5,
         max_grad_norm: float = 1.0,
@@ -67,6 +68,7 @@ class Trainer:
         self.checkpoint_dir = checkpoint_dir
         self.device = torch.device(device) if isinstance(device, str) else device
         self.use_amp = use_amp and (self.device.type == "cuda")
+        self.use_compile = bool(use_compile) and self.device.type == "cuda" and hasattr(torch, "compile")
         self.gradient_accumulation_steps = max(1, gradient_accumulation_steps)
         self.sample_interval = sample_interval
         self.max_grad_norm = max_grad_norm
@@ -77,13 +79,26 @@ class Trainer:
 
         self.model.to(self.device)
 
+        # Optional torch.compile of the UNet denoiser. On small GPUs this fuses
+        # pointwise ops (SiLU / GroupNorm / FiLM) and is a large speedup.
+        if self.use_compile:
+            try:
+                self.model.denoiser = torch.compile(self.model.denoiser)
+                print("\u26a1 torch.compile enabled for denoiser")
+            except Exception as exc:  # pragma: no cover - environment dependent
+                print(f"\u26a0\ufe0f  torch.compile unavailable ({exc}); continuing eager")
+                self.use_compile = False
+
         # Optimizer and Scheduler
-        self.optimizer = optim.AdamW(
-            self.model.parameters(),
-            lr=self.lr,
-            betas=(0.9, 0.999),
-            weight_decay=self.weight_decay,
-        )
+        opt_kwargs = dict(lr=self.lr, betas=(0.9, 0.999), weight_decay=self.weight_decay)
+        if self.device.type == "cuda":
+            try:
+                # Fused AdamW cuts optimizer overhead substantially.
+                self.optimizer = optim.AdamW(self.model.parameters(), fused=True, **opt_kwargs)
+            except (TypeError, RuntimeError):
+                self.optimizer = optim.AdamW(self.model.parameters(), **opt_kwargs)
+        else:
+            self.optimizer = optim.AdamW(self.model.parameters(), **opt_kwargs)
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer,
             T_max=self.num_epochs,
@@ -138,7 +153,7 @@ class Trainer:
             print(f"📂 Loading checkpoint: {checkpoint_path}")
             checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
 
-            self.model.load_state_dict(checkpoint["model_state"])
+            self.model.load_state_dict(self._remap_state_dict(checkpoint["model_state"]))
             self.optimizer.load_state_dict(checkpoint["optimizer_state"])
             if "scheduler_state" in checkpoint:
                 self.scheduler.load_state_dict(checkpoint["scheduler_state"])
@@ -214,19 +229,21 @@ class Trainer:
 
                     self.optimizer.zero_grad()
 
-                scaled_loss = loss.item() * self.gradient_accumulation_steps
+                scaled_loss = loss.detach() * self.gradient_accumulation_steps
                 epoch_losses.append(scaled_loss)
                 self.batch_times.append(time.time() - batch_start)
 
-                pbar.set_postfix({
-                    "loss": f"{scaled_loss:.4f}",
-                    "lr": f"{self.optimizer.param_groups[0]['lr']:.6f}",
-                })
+                # Avoid a GPU sync on every batch; refresh the progress bar periodically.
+                if (batch_idx + 1) % 10 == 0:
+                    pbar.set_postfix({
+                        "loss": f"{scaled_loss.item():.4f}",
+                        "lr": f"{self.optimizer.param_groups[0]['lr']:.6f}",
+                    })
 
             pbar.close()
 
             # Epoch summary
-            avg_epoch_loss = float(np.mean(epoch_losses))
+            avg_epoch_loss = float(torch.stack(epoch_losses).mean().item())
             self.training_losses.append(avg_epoch_loss)
             self.scheduler.step()
 
@@ -250,6 +267,20 @@ class Trainer:
         }
 
         return self.model, self.training_losses, timing_info
+
+    def _strip_compile_prefix(self, state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """Remove torch.compile `_orig_mod` prefixes so checkpoints stay portable."""
+        return {k.replace("._orig_mod.", "."): v for k, v in state_dict.items()}
+
+    def _remap_state_dict(self, state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """Strip/apply torch.compile `_orig_mod` prefixes so checkpoints stay portable."""
+        state_dict = self._strip_compile_prefix(state_dict)
+        if any("._orig_mod." in k for k in self.model.state_dict().keys()):
+            state_dict = {
+                (k.replace("denoiser.", "denoiser._orig_mod.", 1) if k.startswith("denoiser.") else k): v
+                for k, v in state_dict.items()
+            }
+        return state_dict
 
     def _save_checkpoint_and_samples(self, epoch: int, current_loss: float) -> None:
         """Helper to generate sample grids and save checkpoint file."""
@@ -303,7 +334,7 @@ class Trainer:
         )
         torch.save({
             "epoch": epoch,
-            "model_state": self.model.state_dict(),
+            "model_state": self._strip_compile_prefix(self.model.state_dict()),
             "optimizer_state": self.optimizer.state_dict(),
             "scheduler_state": self.scheduler.state_dict(),
             "loss": current_loss,

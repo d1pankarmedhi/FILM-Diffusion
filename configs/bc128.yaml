@@ -17,6 +17,7 @@ training:
   cfg_dropout: 0.1
   guidance_scale: 7.5
   use_amp: true
+  use_compile: true
   gradient_accumulation_steps: 1
   sample_interval: 5
   checkpoint_dir: "./checkpoints/bc128"
