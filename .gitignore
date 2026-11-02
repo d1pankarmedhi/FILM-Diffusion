@@ -39,22 +39,21 @@ venv.bak/
 *.pt
 *.pth
 *.ckpt
-checkpoints/
-weights/
+/checkpoints/
+/weights/
 
 # Datasets
-data/
-./data/
-FashionMNIST/
-MNIST/
-CIFAR10/
+/data/
+/FashionMNIST/
+/MNIST/
+/CIFAR10/
 
 # Generated outputs & logs
-outputs/
-test_samples/
-evaluation/
-wandb/
-runs/
+/outputs/
+/test_samples/
+/evaluation/
+/wandb/
+/runs/
 *.png
 *.jpg
 *.jpeg
